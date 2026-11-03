@@ -1,38 +1,40 @@
-from io import BytesIO
-from pathlib import Path
+
+# ============================================
+# TRANSAI - AI LANGUAGE TRANSLATOR
+# FastAPI Backend
+# Version: 3.2.1
+# ============================================
+
 import os
+import re
+from pathlib import Path
+from io import BytesIO
+
 import requests
+import numpy as np
+import easyocr
 
 from PIL import Image, UnidentifiedImageError
 from langdetect import detect, LangDetectException
 
-from fastapi import (
-    FastAPI,
-    File,
-    Form,
-    HTTPException,
-    UploadFile
-)
-
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-# =====================================
-# TRANSAI CONFIGURATION
-# =====================================
+# ============================================
+# PATH CONFIGURATION
+# ============================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
 
 def find_folder(folder_name):
-
-    for folder in BASE_DIR.iterdir():
-
-        if folder.is_dir() and folder.name.lower() == folder_name.lower():
-            return folder
-
+    """Find folder even if its name has different capitalization."""
+    for item in BASE_DIR.iterdir():
+        if item.is_dir() and item.name.lower() == folder_name.lower():
+            return item
     return BASE_DIR / folder_name
 
 
@@ -40,35 +42,22 @@ TEMPLATES_DIR = find_folder("templates")
 STATIC_DIR = find_folder("static")
 
 
-# =====================================
-# TRANSLATION SERVICES
-# =====================================
-
-LIBRE_URL = os.getenv(
-    "LIBRE_URL",
-    "https://translate.argosopentech.com"
-)
-
-MYMEMORY_URL = "https://api.mymemory.translated.net/get"
-
-
-# =====================================
-# FASTAPI APPLICATION
-# =====================================
+# ============================================
+# FASTAPI APP
+# ============================================
 
 app = FastAPI(
-    title="TransAI AI Translator",
-    description="AI-powered language translation application",
-    version="3.2.0"
+    title="TransAI",
+    description="AI Language Translation Application",
+    version="3.2.1"
 )
 
 
-# =====================================
+# ============================================
 # STATIC FILES
-# =====================================
+# ============================================
 
-if STATIC_DIR.is_dir():
-
+if STATIC_DIR.exists():
     app.mount(
         "/static",
         StaticFiles(directory=str(STATIC_DIR)),
@@ -76,12 +65,11 @@ if STATIC_DIR.is_dir():
     )
 
 
-# =====================================
+# ============================================
 # SUPPORTED LANGUAGES
-# =====================================
+# ============================================
 
 LANGUAGES = [
-
     {"code": "auto", "name": "Auto Detect"},
     {"code": "en", "name": "English"},
     {"code": "hi", "name": "Hindi"},
@@ -94,179 +82,99 @@ LANGUAGES = [
     {"code": "pt", "name": "Portuguese"},
     {"code": "ru", "name": "Russian"},
     {"code": "ja", "name": "Japanese"},
-    {"code": "zh", "name": "Chinese"},
     {"code": "ko", "name": "Korean"},
+    {"code": "zh", "name": "Chinese"},
     {"code": "ar", "name": "Arabic"},
     {"code": "tr", "name": "Turkish"},
     {"code": "nl", "name": "Dutch"},
     {"code": "pl", "name": "Polish"},
     {"code": "uk", "name": "Ukrainian"},
-    {"code": "vi", "name": "Vietnamese"},
-    {"code": "th", "name": "Thai"},
-    {"code": "id", "name": "Indonesian"},
-    {"code": "ms", "name": "Malay"},
-    {"code": "fa", "name": "Persian"},
-    {"code": "el", "name": "Greek"},
-    {"code": "he", "name": "Hebrew"},
     {"code": "sv", "name": "Swedish"},
     {"code": "da", "name": "Danish"},
     {"code": "fi", "name": "Finnish"},
-    {"code": "no", "name": "Norwegian"},
-    {"code": "cs", "name": "Czech"},
-    {"code": "ro", "name": "Romanian"},
-    {"code": "hu", "name": "Hungarian"},
+    {"code": "el", "name": "Greek"},
+    {"code": "he", "name": "Hebrew"},
+    {"code": "th", "name": "Thai"},
+    {"code": "vi", "name": "Vietnamese"},
+    {"code": "id", "name": "Indonesian"},
+    {"code": "ms", "name": "Malay"},
     {"code": "ta", "name": "Tamil"},
     {"code": "te", "name": "Telugu"},
     {"code": "mr", "name": "Marathi"},
     {"code": "gu", "name": "Gujarati"},
-    {"code": "pa", "name": "Punjabi"}
-
+    {"code": "pa", "name": "Punjabi"},
+    {"code": "ne", "name": "Nepali"},
+    {"code": "fa", "name": "Persian"},
+    {"code": "ro", "name": "Romanian"},
+    {"code": "hu", "name": "Hungarian"},
+    {"code": "cs", "name": "Czech"},
 ]
 
 
-LANGUAGE_CODES = {
-    language["code"]: language["name"]
-    for language in LANGUAGES
-}
-
-
-# =====================================
-# LANGUAGE NORMALIZATION
-# =====================================
+# ============================================
+# LANGUAGE CODE NORMALIZATION
+# ============================================
 
 LANGUAGE_ALIASES = {
-
     "zh-cn": "zh",
     "zh-tw": "zh",
+    "zh-cn": "zh",
     "iw": "he",
     "in": "id",
-    "nb": "no"
-
+    "jw": "jv",
 }
 
 
 def normalize_language(language):
-
     if not language:
         return "auto"
 
     language = language.strip().lower()
+    language = LANGUAGE_ALIASES.get(language, language)
 
-    language = LANGUAGE_ALIASES.get(
-        language,
-        language
-    )
-
-    if language in LANGUAGE_CODES:
-        return language
-
-    for code, name in LANGUAGE_CODES.items():
-
-        if name.lower() == language:
-            return code
-
-    return "auto"
+    return language.split("-")[0]
 
 
-# =====================================
-# AUTOMATIC LANGUAGE DETECTION
-# =====================================
+# ============================================
+# LANGUAGE DETECTION
+# ============================================
 
 def detect_source_language(text):
-
     try:
-
         detected = detect(text)
-
-        detected = normalize_language(detected)
-
-        if detected == "auto":
-            return "en"
-
-        return detected
-
+        return normalize_language(detected)
     except LangDetectException:
-
         return "en"
-
     except Exception:
-
         return "en"
 
 
-# =====================================
-# TRANSLATION REQUEST MODEL
-# =====================================
+# ============================================
+# REQUEST MODEL
+# ============================================
 
 class TranslateRequest(BaseModel):
-
-    text: str = Field(
-        ...,
-        min_length=1,
-        max_length=10000
-    )
-
+    text: str
     source_language: str = "auto"
-
     target_language: str = "hi"
 
 
-# =====================================
-# MYMEMORY TRANSLATION ENGINE
-# =====================================
+# ============================================
+# MYMEMORY TRANSLATION
+# ============================================
 
-def mymemory_translate(text, source, target):
+def mymemory_translate(text, source_language, target_language):
+
+    url = "https://api.mymemory.translated.net/get"
 
     params = {
         "q": text,
-        "langpair": f"{source}|{target}"
+        "langpair": f"{source_language}|{target_language}"
     }
 
     response = requests.get(
-        MYMEMORY_URL,
-        params=params,
-        timeout=20
-    )
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    translated_text = data.get(
-        "responseData", {}
-    ).get("translatedText")
-
-    if not translated_text:
-        raise ValueError("MyMemory returned empty response")
-
-    status = data.get("responseStatus")
-
-    if status and int(status) != 200:
-        raise ValueError(
-            data.get("responseDetails", "Translation failed")
-        )
-
-    return translated_text
-
-
-# =====================================
-# LIBRETRANSLATE ENGINE
-# =====================================
-
-def libre_translate(text, source, target):
-
-    url = f"{LIBRE_URL.rstrip('/')}/translate"
-
-    payload = {
-        "q": text,
-        "source": source,
-        "target": target,
-        "format": "text"
-    }
-
-    response = requests.post(
         url,
-        json=payload,
+        params=params,
         timeout=25
     )
 
@@ -274,231 +182,149 @@ def libre_translate(text, source, target):
 
     data = response.json()
 
-    translated_text = data.get("translatedText")
+    translated_text = (
+        data.get("responseData", {})
+        .get("translatedText", "")
+    )
 
     if not translated_text:
-        raise ValueError("LibreTranslate returned empty response")
+        raise ValueError("MyMemory returned an empty translation.")
+
+    if data.get("responseStatus") not in (200, "200", None):
+        raise ValueError("MyMemory translation failed.")
 
     return translated_text
 
 
-# =====================================
+# ============================================
+# LIBRETRANSLATE BACKUP
+# ============================================
+
+def libre_translate(text, source_language, target_language):
+
+    servers = [
+        "https://libretranslate.de/translate",
+        "https://translate.argosopentech.com/translate"
+    ]
+
+    payload = {
+        "q": text,
+        "source": source_language,
+        "target": target_language,
+        "format": "text"
+    }
+
+    last_error = None
+
+    for server in servers:
+        try:
+            response = requests.post(
+                server,
+                data=payload,
+                timeout=20
+            )
+
+            response.raise_for_status()
+
+            data = response.json()
+            translated_text = data.get("translatedText")
+
+            if translated_text:
+                return translated_text
+
+        except Exception as error:
+            last_error = error
+
+    raise RuntimeError(
+        f"Backup translation service failed: {last_error}"
+    )
+
+
+# ============================================
 # MAIN TRANSLATION FUNCTION
-# =====================================
+# ============================================
 
-def translate_text(text, source_language, target_language):
+def translate_text(text, source_language="auto", target_language="hi"):
 
-    text = text.strip()
+    text = (text or "").strip()
 
     if not text:
+        raise ValueError("Please enter some text to translate.")
 
-        raise HTTPException(
-            status_code=400,
-            detail="Please enter text to translate."
-        )
+    if len(text) > 4500:
+        raise ValueError("Text is too long. Please enter less than 4500 characters.")
 
-    source = normalize_language(source_language)
+    source_language = normalize_language(source_language)
+    target_language = normalize_language(target_language)
 
-    target = normalize_language(target_language)
+    supported_codes = {
+        language["code"] for language in LANGUAGES
+    }
 
-    if target == "auto":
+    if target_language not in supported_codes or target_language == "auto":
+        raise ValueError("Please select a valid target language.")
 
-        raise HTTPException(
-            status_code=400,
-            detail="Please select a target language."
-        )
+    if source_language == "auto":
+        source_language = detect_source_language(text)
 
-    if source == "auto":
+    if source_language not in supported_codes or source_language == "auto":
+        source_language = "en"
 
-        source = detect_source_language(text)
-
-    if source == target:
-
+    if source_language == target_language:
         return {
             "translated_text": text,
-            "engine": "No Translation Needed",
-            "source_language": source,
-            "target_language": target
+            "engine": "Same Language",
+            "source_language": source_language,
+            "target_language": target_language
         }
 
     errors = []
 
-    # PRIMARY: MYMEMORY
-
+    # First translation engine
     try:
-
-        result = mymemory_translate(
+        translated = mymemory_translate(
             text,
-            source,
-            target
+            source_language,
+            target_language
         )
 
         return {
-            "translated_text": result,
+            "translated_text": translated,
             "engine": "MyMemory",
-            "source_language": source,
-            "target_language": target
+            "source_language": source_language,
+            "target_language": target_language
         }
 
     except Exception as error:
-
         errors.append(f"MyMemory: {str(error)}")
 
-        print(
-            "MyMemory failed:",
-            str(error),
-            flush=True
-        )
-
-    # BACKUP: LIBRETRANSLATE
-
+    # Backup translation engine
     try:
-
-        result = libre_translate(
+        translated = libre_translate(
             text,
-            source,
-            target
+            source_language,
+            target_language
         )
 
         return {
-            "translated_text": result,
+            "translated_text": translated,
             "engine": "LibreTranslate",
-            "source_language": source,
-            "target_language": target
+            "source_language": source_language,
+            "target_language": target_language
         }
 
     except Exception as error:
-
         errors.append(f"LibreTranslate: {str(error)}")
 
-        print(
-            "LibreTranslate failed:",
-            str(error),
-            flush=True
-        )
-
-    raise HTTPException(
-        status_code=502,
-        detail={
-            "message": "All translation services are currently unavailable.",
-            "errors": errors
-        }
+    raise RuntimeError(
+        "Translation services are temporarily unavailable. "
+        + " | ".join(errors)
     )
 
 
-# =====================================
-# HOME PAGE
-# =====================================
-
-@app.get("/")
-def home():
-
-    possible_paths = [
-        TEMPLATES_DIR / "index.html",
-        BASE_DIR / "index.html"
-    ]
-
-    index_file = next(
-        (
-            path for path in possible_paths
-            if path.is_file()
-        ),
-        None
-    )
-
-    if index_file is None:
-
-        print(
-            "HTML FILE NOT FOUND!",
-            flush=True
-        )
-
-        print(
-            "BASE DIR:",
-            BASE_DIR,
-            flush=True
-        )
-
-        print(
-            "TEMPLATES DIR:",
-            TEMPLATES_DIR,
-            flush=True
-        )
-
-        print(
-            "PROJECT FILES:",
-            list(BASE_DIR.iterdir()),
-            flush=True
-        )
-
-        raise HTTPException(
-            status_code=404,
-            detail="index.html not found. Check templates folder."
-        )
-
-    return FileResponse(
-        str(index_file),
-        media_type="text/html"
-    )
-
-
-# =====================================
-# HEALTH CHECK
-# =====================================
-
-@app.get("/health")
-def health():
-
-    return {
-        "status": "online",
-        "application": "TransAI AI Translator",
-        "version": "3.2.0",
-        "translation_engines": [
-            "MyMemory",
-            "LibreTranslate"
-        ],
-        "ocr": "EasyOCR"
-    }
-
-
-# =====================================
-# LANGUAGES API
-# =====================================
-
-@app.get("/languages")
-def get_languages():
-
-    return {
-        "languages": LANGUAGES
-    }
-
-
-# =====================================
-# TEXT TRANSLATION API
-# =====================================
-
-@app.post("/translate")
-def translate(request: TranslateRequest):
-
-    result = translate_text(
-        request.text,
-        request.source_language,
-        request.target_language
-    )
-
-    return {
-        "success": True,
-        "original_text": request.text,
-        "translated_text": result["translated_text"],
-        "source_language": result["source_language"],
-        "target_language": result["target_language"],
-        "engine": result["engine"]
-    }
-
-
-# =====================================
-# EASY OCR SETUP - LAZY LOADING
-# =====================================
+# ============================================
+# OCR READER - LAZY LOADING
+# ============================================
 
 ocr_reader = None
 
@@ -508,50 +334,125 @@ def get_ocr_reader():
     global ocr_reader
 
     if ocr_reader is None:
-
-        print(
-            "Loading EasyOCR...",
-            flush=True
-        )
-
-        import easyocr
-
         ocr_reader = easyocr.Reader(
             ["en"],
             gpu=False
         )
 
-        print(
-            "EasyOCR loaded successfully.",
-            flush=True
-        )
-
     return ocr_reader
 
 
-# =====================================
-# IMAGE TRANSLATION API
-# =====================================
+# ============================================
+# HOME PAGE
+# ============================================
 
-@app.post("/translate-image")
-async def translate_image(
+@app.get("/")
+async def home():
 
-    file: UploadFile = File(...),
+    index_file = TEMPLATES_DIR / "index.html"
 
-    source_language: str = Form("auto"),
+    if not index_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="index.html not found. Please check your templates folder."
+        )
 
-    target_language: str = Form("hi")
+    return FileResponse(str(index_file))
 
-):
 
-    if (
-        not file.content_type
-        or not file.content_type.startswith("image/")
-    ):
+# ============================================
+# HEALTH CHECK
+# ============================================
+
+@app.get("/health")
+async def health():
+
+    return {
+        "status": "healthy",
+        "application": "TransAI",
+        "version": "3.2.1"
+    }
+
+
+# ============================================
+# GET LANGUAGES
+# ============================================
+
+@app.get("/languages")
+async def get_languages():
+
+    return {
+        "success": True,
+        "languages": LANGUAGES
+    }
+
+
+# ============================================
+# TEXT TRANSLATION API
+# ============================================
+
+@app.post("/translate")
+async def translate(request: TranslateRequest):
+
+    try:
+
+        result = translate_text(
+            request.text,
+            request.source_language,
+            request.target_language
+        )
+
+        return {
+            "success": True,
+            "original_text": request.text,
+            "translated_text": result["translated_text"],
+            "source_language": result["source_language"],
+            "target_language": result["target_language"],
+            "engine": result["engine"]
+        }
+
+    except ValueError as error:
 
         raise HTTPException(
             status_code=400,
-            detail="Please upload a valid image file."
+            detail=str(error)
+        )
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=503,
+            detail=str(error)
+        )
+
+
+# ============================================
+# IMAGE OCR + TRANSLATION API
+# ============================================
+
+@app.post("/translate-image")
+async def translate_image(
+    file: UploadFile = File(...),
+    source_language: str = Form("auto"),
+    target_language: str = Form("hi")
+):
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Please select an image."
+        )
+
+    allowed_extensions = {
+        ".jpg", ".jpeg", ".png", ".webp", ".bmp"
+    }
+
+    extension = Path(file.filename).suffix.lower()
+
+    if extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported image format."
         )
 
     try:
@@ -559,24 +460,24 @@ async def translate_image(
         image_bytes = await file.read()
 
         if not image_bytes:
-
             raise HTTPException(
                 status_code=400,
                 detail="Uploaded image is empty."
             )
 
         if len(image_bytes) > 10 * 1024 * 1024:
-
             raise HTTPException(
                 status_code=413,
                 detail="Image size must be less than 10 MB."
             )
 
-        image = Image.open(
-            BytesIO(image_bytes)
-        ).convert("RGB")
-
-        import numpy as np
+        try:
+            image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        except UnidentifiedImageError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image file."
+            )
 
         image_array = np.array(image)
 
@@ -591,13 +492,12 @@ async def translate_image(
         extracted_text = "\n".join(
             line.strip()
             for line in extracted_lines
-            if line.strip()
+            if line and line.strip()
         )
 
         if not extracted_text:
-
             raise HTTPException(
-                status_code=422,
+                status_code=400,
                 detail="No readable text found in this image."
             )
 
@@ -617,41 +517,24 @@ async def translate_image(
         }
 
     except HTTPException:
-
         raise
-
-    except UnidentifiedImageError:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or unsupported image."
-        )
 
     except Exception as error:
 
-        print(
-            "Image translation error:",
-            str(error),
-            flush=True
-        )
-
         raise HTTPException(
             status_code=500,
-            detail="Unable to process this image. Please try another image."
+            detail=f"Image translation failed: {str(error)}"
         )
 
 
-# =====================================
-# TRANSAI STARTUP MESSAGE
-# =====================================
+# ============================================
+# STARTUP MESSAGE
+# ============================================
 
 @app.on_event("startup")
 async def startup_event():
 
-    print("================================")
-    print(" TRANSAI AI TRANSLATOR")
-    print(" Backend Started Successfully")
-    print(" Primary: MyMemory")
-    print(" Backup: LibreTranslate")
-    print(" OCR: EasyOCR (Lazy Loading)")
-    print("================================")
+    print("------------------------------------")
+    print("       TRANSAI BACKEND STARTED      ")
+    print("       Version: 3.2.1               ")
+    print("------------------------------------")
