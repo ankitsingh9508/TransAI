@@ -474,6 +474,18 @@ body.dark .theme-toggle .fa-moon {
     margin-bottom: 18px;
 }
 
+/* DROPDOWN IMPROVEMENTS */
+
+.card-header select {
+    color: var(--text);
+    background-color: var(--soft);
+}
+
+.card-header select option {
+    background: var(--card);
+    color: var(--text);
+}
+
 .card-header h3 {
     font-size: 14px;
     font-weight: 700;
@@ -1365,4 +1377,65 @@ footer small {
         transition-duration: .01ms !important;
         scroll-behavior: auto !important;
     }
+}
+/* =========================================
+   TRANSAI FINAL IMPROVEMENTS
+========================================= */
+
+/* Better text overflow */
+
+.result-box {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+/* Disabled buttons */
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* Loading state */
+
+button.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* Voice recognition active state */
+
+.voice-fab.listening {
+    background: linear-gradient(135deg, #ff5279, #9e35ed);
+    color: white;
+    animation: listeningPulse 1s infinite;
+}
+
+/* Better mobile dropdown */
+
+@media(max-width: 700px) {
+
+    .card-header select {
+        max-width: 155px;
+        min-width: 110px;
+    }
+
+    .translate-card {
+        overflow: hidden;
+    }
+
+    .result-box {
+        overflow-y: auto;
+    }
+
+}
+
+/* Better focus visibility */
+
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 3px;
 }

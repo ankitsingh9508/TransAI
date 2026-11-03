@@ -1,8 +1,7 @@
 
 // =============================================
 // TRANSAI - PREMIUM AI TRANSLATOR
-// COMPLETE FRESH JAVASCRIPT
-// Version 4.0
+// COMPLETE JAVASCRIPT - VERSION 4.1
 // =============================================
 
 const $ = (id) => document.getElementById(id);
@@ -11,6 +10,40 @@ let languages = [];
 let lastTranslation = "";
 let cameraStream = null;
 let recognition = null;
+
+const MAX_CHARACTERS = 4500;
+
+
+// =============================================
+// SAFE STORAGE
+// =============================================
+
+function storageGet(key, fallback = null) {
+    try {
+        const value = localStorage.getItem(key);
+        return value === null ? fallback : value;
+    } catch {
+        return fallback;
+    }
+}
+
+function storageSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (error) {
+        console.warn("Storage unavailable:", error);
+        return false;
+    }
+}
+
+function storageRemove(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (error) {
+        console.warn("Storage unavailable:", error);
+    }
+}
 
 
 // =============================================
@@ -29,49 +62,47 @@ function showMessage(text, type = "") {
 
 // =============================================
 // API RESPONSE HANDLER
-// FIXED [OBJECT OBJECT] ERROR
 // =============================================
 
 async function getResponse(response) {
+    const responseText = await response.text();
 
-    let data = {};
+    let data;
 
     try {
-        data = await response.json();
+        data = JSON.parse(responseText);
     } catch {
+        console.error(
+            "Non-JSON server response:",
+            responseText.slice(0, 500)
+        );
+
+        if (response.status >= 500) {
+            throw new Error(
+                "Server error. Please try again after some time."
+            );
+        }
+
         throw new Error(
-            "Invalid server response. Please try again."
+            "Server returned an invalid response. Please check the deployment."
         );
     }
 
     if (!response.ok) {
-
-        let errorMessage =
-            "Something went wrong. Please try again.";
+        let errorMessage = "Something went wrong. Please try again.";
 
         if (typeof data.detail === "string") {
-
             errorMessage = data.detail;
-
         } else if (
             data.detail &&
             typeof data.detail === "object"
         ) {
-
             errorMessage =
                 data.detail.message ||
                 data.detail.error ||
                 "Translation service error.";
-
-            if (Array.isArray(data.detail.errors)) {
-                errorMessage +=
-                    "\n" + data.detail.errors.join("\n");
-            }
-
         } else if (data.message) {
-
             errorMessage = data.message;
-
         }
 
         throw new Error(errorMessage);
@@ -86,15 +117,13 @@ async function getResponse(response) {
 // =============================================
 
 function getTranslationText(data) {
-
     const value = data.translated_text;
 
     if (typeof value === "string") {
         return value;
     }
 
-    if (typeof value === "object" && value !== null) {
-
+    if (value && typeof value === "object") {
         if (typeof value.translatedText === "string") {
             return value.translatedText;
         }
@@ -119,60 +148,65 @@ function getTranslationText(data) {
 // =============================================
 
 async function loadLanguages() {
-
     try {
-
         showMessage("Loading languages...");
 
         const response = await fetch("/languages");
-
         const data = await getResponse(response);
 
-        languages = data.languages || [];
+        languages = Array.isArray(data.languages)
+            ? data.languages.filter(
+                language =>
+                    language &&
+                    language.code &&
+                    language.code !== "auto"
+            )
+            : [];
 
         const source = $("sourceLanguage");
         const target = $("targetLanguage");
 
         if (!source || !target) return;
 
-        source.innerHTML =
-            '<option value="auto">Auto-detect</option>';
+        source.innerHTML = "";
+        target.innerHTML = "";
 
-        target.innerHTML =
-            '<option value="">Choose Language</option>';
+        // Auto Detect - only once
+        const autoOption = document.createElement("option");
+        autoOption.value = "auto";
+        autoOption.textContent = "Auto-detect";
+        source.appendChild(autoOption);
+
+        // Target placeholder
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Choose Language";
+        target.appendChild(placeholder);
 
         languages.forEach(language => {
+            const sourceOption = document.createElement("option");
+            sourceOption.value = language.code;
+            sourceOption.textContent = language.name;
 
-            const option1 =
-                document.createElement("option");
+            const targetOption = document.createElement("option");
+            targetOption.value = language.code;
+            targetOption.textContent = language.name;
 
-            option1.value = language.code;
-            option1.textContent = language.name;
-
-            source.appendChild(option1);
-
-            const option2 =
-                document.createElement("option");
-
-            option2.value = language.code;
-            option2.textContent = language.name;
-
-            target.appendChild(option2);
-
+            source.appendChild(sourceOption);
+            target.appendChild(targetOption);
         });
 
-        target.value = "hi";
+        source.value = "auto";
+
+        target.value = languages.some(
+            language => language.code === "hi"
+        ) ? "hi" : "";
 
         showMessage("");
 
     } catch (error) {
-
         console.error("Language loading error:", error);
-
-        showMessage(
-            error.message,
-            "error"
-        );
+        showMessage(error.message, "error");
     }
 }
 
@@ -181,19 +215,21 @@ async function loadLanguages() {
 // CHARACTER COUNT
 // =============================================
 
+function updateCharacterCount() {
+    const sourceText = $("sourceText");
+    const charCount = $("charCount");
+
+    if (!sourceText || !charCount) return;
+
+    charCount.textContent =
+        `${sourceText.value.length} / ${MAX_CHARACTERS}`;
+}
+
 if ($("sourceText")) {
-
-    $("sourceText").addEventListener("input", () => {
-
-        const length = $("sourceText").value.length;
-
-        if ($("charCount")) {
-            $("charCount").textContent =
-                `${length} / 5000`;
-        }
-
-    });
-
+    $("sourceText").addEventListener(
+        "input",
+        updateCharacterCount
+    );
 }
 
 
@@ -202,82 +238,89 @@ if ($("sourceText")) {
 // =============================================
 
 async function translateText() {
+    const sourceText = $("sourceText");
+    const sourceLanguage = $("sourceLanguage");
+    const targetLanguage = $("targetLanguage");
+    const resultText = $("resultText");
+    const button = $("translateBtn");
 
-    const text = $("sourceText").value.trim();
+    if (
+        !sourceText ||
+        !sourceLanguage ||
+        !targetLanguage ||
+        !resultText
+    ) return;
 
-    const source = $("sourceLanguage").value;
-
-    const target = $("targetLanguage").value;
+    const text = sourceText.value.trim();
+    const source = sourceLanguage.value;
+    const target = targetLanguage.value;
 
     if (!text) {
+        showMessage("Please enter some text.", "error");
+        return;
+    }
 
+    if (text.length > MAX_CHARACTERS) {
         showMessage(
-            "Please enter some text.",
+            `Maximum ${MAX_CHARACTERS} characters allowed.`,
             "error"
         );
-
         return;
     }
 
     if (!target) {
-
         showMessage(
             "Please choose a target language.",
             "error"
         );
-
         return;
     }
 
-    const button = $("translateBtn");
+    if (source === target) {
+        showMessage(
+            "Source and target languages cannot be the same.",
+            "error"
+        );
+        return;
+    }
 
-    button.disabled = true;
-
-    button.innerHTML =
-        '<i class="fa-solid fa-spinner fa-spin"></i> Translating...';
+    if (button) {
+        button.disabled = true;
+        button.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Translating...';
+    }
 
     showMessage("Translating your text...");
 
     try {
-
         const response = await fetch("/translate", {
-
             method: "POST",
-
             headers: {
                 "Content-Type": "application/json"
             },
-
             body: JSON.stringify({
-
-                text: text,
-
+                text,
                 source_language: source,
-
                 target_language: target
-
             })
-
         });
 
         const data = await getResponse(response);
 
         lastTranslation = getTranslationText(data);
 
-        $("resultText").textContent = lastTranslation;
+        resultText.textContent = lastTranslation;
 
         if ($("resultMeta")) {
-
             $("resultMeta").textContent =
                 `${lastTranslation.length} characters`;
-
         }
 
         saveHistory(
             text,
             lastTranslation,
-            $("sourceLanguage").selectedOptions[0].textContent,
-            $("targetLanguage").selectedOptions[0].textContent
+            sourceLanguage.selectedOptions[0]?.textContent || source,
+            targetLanguage.selectedOptions[0]?.textContent || target
         );
 
         showMessage(
@@ -286,51 +329,31 @@ async function translateText() {
         );
 
     } catch (error) {
-
         console.error("Translation error:", error);
-
-        showMessage(
-            error.message,
-            "error"
-        );
+        showMessage(error.message, "error");
 
     } finally {
-
-        button.disabled = false;
-
-        button.innerHTML =
-            '<i class="fa-solid fa-language"></i> &nbsp; Translate <span>→</span>';
-
+        if (button) {
+            button.disabled = false;
+            button.innerHTML =
+                '<i class="fa-solid fa-language"></i> &nbsp; Translate <span>→</span>';
+        }
     }
 }
 
-
 if ($("translateBtn")) {
-
     $("translateBtn").addEventListener(
         "click",
         translateText
     );
-
 }
 
-
 if ($("sourceText")) {
-
-    $("sourceText").addEventListener(
-        "keydown",
-        event => {
-
-            if (
-                event.ctrlKey &&
-                event.key === "Enter"
-            ) {
-                translateText();
-            }
-
+    $("sourceText").addEventListener("keydown", event => {
+        if (event.ctrlKey && event.key === "Enter") {
+            translateText();
         }
-    );
-
+    });
 }
 
 
@@ -339,90 +362,70 @@ if ($("sourceText")) {
 // =============================================
 
 async function translateImage(file) {
-
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-
-        showMessage(
-            "Please select a valid image.",
-            "error"
-        );
-
+        showMessage("Please select a valid image.", "error");
         return;
     }
 
-    const target = $("targetLanguage").value;
+    if (file.size > 10 * 1024 * 1024) {
+        showMessage(
+            "Image size must be less than 10 MB.",
+            "error"
+        );
+        return;
+    }
+
+    const target = $("targetLanguage")?.value;
+    const source = $("sourceLanguage")?.value || "auto";
 
     if (!target) {
-
         showMessage(
             "Please choose a target language.",
             "error"
         );
-
         return;
     }
 
     const formData = new FormData();
 
+    // Backend expects the field name "file"
     formData.append("file", file);
-
-    formData.append(
-        "target_language",
-        target
-    );
-
-    formData.append(
-        "source_language",
-        $("sourceLanguage").value
-    );
+    formData.append("source_language", source);
+    formData.append("target_language", target);
 
     showMessage("Extracting text from image...");
 
     try {
-
-        const response = await fetch(
-            "/translate-image",
-            {
-                method: "POST",
-                body: formData
-            }
-        );
+        const response = await fetch("/translate-image", {
+            method: "POST",
+            body: formData
+        });
 
         const data = await getResponse(response);
 
         if (data.extracted_text) {
-
-            $("sourceText").value =
-                data.extracted_text;
-
-            if ($("charCount")) {
-
-                $("charCount").textContent =
-                    `${data.extracted_text.length} / 5000`;
-
-            }
-
+            $("sourceText").value = data.extracted_text;
+            updateCharacterCount();
         }
 
         lastTranslation = getTranslationText(data);
 
-        $("resultText").textContent =
-            lastTranslation;
+        if ($("resultText")) {
+            $("resultText").textContent = lastTranslation;
+        }
 
         if ($("resultMeta")) {
-
             $("resultMeta").textContent =
                 `${lastTranslation.length} characters`;
-
         }
 
         saveHistory(
             data.extracted_text || "",
             lastTranslation,
-            $("sourceLanguage").selectedOptions[0].textContent,
-            $("targetLanguage").selectedOptions[0].textContent
+            $("sourceLanguage")?.selectedOptions[0]?.textContent || source,
+            $("targetLanguage")?.selectedOptions[0]?.textContent || target
         );
 
         showMessage(
@@ -431,16 +434,9 @@ async function translateImage(file) {
         );
 
     } catch (error) {
-
         console.error("Image translation error:", error);
-
-        showMessage(
-            error.message,
-            "error"
-        );
-
+        showMessage(error.message, "error");
     }
-
 }
 
 
@@ -448,39 +444,34 @@ async function translateImage(file) {
 // IMAGE UPLOAD
 // =============================================
 
+function openImagePicker() {
+    $("imageInput")?.click();
+}
+
 if ($("uploadBtn")) {
-
-    $("uploadBtn").addEventListener("click", () => {
-        $("imageInput").click();
-    });
-
+    $("uploadBtn").addEventListener(
+        "click",
+        openImagePicker
+    );
 }
 
 if ($("multiUpload")) {
-
-    $("multiUpload").addEventListener("click", () => {
-        $("imageInput").click();
-    });
-
+    $("multiUpload").addEventListener(
+        "click",
+        openImagePicker
+    );
 }
 
 if ($("imageInput")) {
+    $("imageInput").addEventListener("change", event => {
+        const file = event.target.files[0];
 
-    $("imageInput").addEventListener(
-        "change",
-        event => {
-
-            const file = event.target.files[0];
-
-            if (file) {
-                translateImage(file);
-            }
-
-            event.target.value = "";
-
+        if (file) {
+            translateImage(file);
         }
-    );
 
+        event.target.value = "";
+    });
 }
 
 
@@ -489,75 +480,63 @@ if ($("imageInput")) {
 // =============================================
 
 async function openCamera() {
-
     if (!navigator.mediaDevices?.getUserMedia) {
-
         showMessage(
             "Camera requires HTTPS or localhost.",
             "error"
         );
-
         return;
     }
 
     try {
-
         cameraStream =
             await navigator.mediaDevices.getUserMedia({
-
                 video: {
                     facingMode: {
                         ideal: "environment"
                     }
                 },
-
                 audio: false
-
             });
 
-        $("cameraVideo").srcObject =
-            cameraStream;
+        const video = $("cameraVideo");
+        const modal = $("cameraModal");
 
-        $("cameraModal").classList.add("open");
+        if (!video || !modal) {
+            closeCamera();
+            return;
+        }
 
-        await $("cameraVideo").play();
+        video.srcObject = cameraStream;
+        modal.classList.add("open");
+
+        await video.play();
 
     } catch (error) {
-
-        console.error(error);
+        console.error("Camera error:", error);
 
         showMessage(
             "Camera permission denied or camera unavailable.",
             "error"
         );
-
     }
-
 }
 
-
 function closeCamera() {
-
     if (cameraStream) {
-
-        cameraStream.getTracks().forEach(
-            track => track.stop()
-        );
+        cameraStream.getTracks().forEach(track => {
+            track.stop();
+        });
 
         cameraStream = null;
-
     }
 
     if ($("cameraVideo")) {
         $("cameraVideo").srcObject = null;
     }
 
-    if ($("cameraModal")) {
-        $("cameraModal").classList.remove("open");
-    }
-
+    $("cameraModal")?.classList.remove("open");
 }
-
 
 if ($("cameraBtn")) {
     $("cameraBtn").addEventListener("click", openCamera);
@@ -571,74 +550,140 @@ if ($("closeCamera")) {
     $("closeCamera").addEventListener("click", closeCamera);
 }
 
-
 if ($("captureBtn")) {
+    $("captureBtn").addEventListener("click", async () => {
+        const video = $("cameraVideo");
+        const canvas = $("cameraCanvas");
 
-    $("captureBtn").addEventListener(
-        "click",
-        async () => {
-
-            const video = $("cameraVideo");
-
-            const canvas = $("cameraCanvas");
-
-            if (!video.videoWidth) {
-
-                showMessage(
-                    "Camera is not ready.",
-                    "error"
-                );
-
-                return;
-            }
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            const context = canvas.getContext("2d");
-
-            context.drawImage(
-                video,
-                0,
-                0
-            );
-
-            const blob = await new Promise(resolve => {
-
-                canvas.toBlob(
-                    resolve,
-                    "image/jpeg",
-                    0.9
-                );
-
-            });
-
-            closeCamera();
-
-            if (blob) {
-
-                const file = new File(
-                    [blob],
-                    "camera-image.jpg",
-                    {
-                        type: "image/jpeg"
-                    }
-                );
-
-                translateImage(file);
-
-            } else {
-
-                showMessage(
-                    "Unable to capture image.",
-                    "error"
-                );
-
-            }
-
+        if (!video || !canvas || !video.videoWidth) {
+            showMessage("Camera is not ready.", "error");
+            return;
         }
-    );
 
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+            showMessage("Unable to capture image.", "error");
+            return;
+        }
+
+        context.drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+        const blob = await new Promise(resolve => {
+            canvas.toBlob(
+                resolve,
+                "image/jpeg",
+                0.9
+            );
+        });
+
+        closeCamera();
+
+        if (!blob) {
+            showMessage("Unable to capture image.", "error");
+            return;
+        }
+
+        const file = new File(
+            [blob],
+            "camera-image.jpg",
+            { type: "image/jpeg" }
+        );
+
+        translateImage(file);
+    });
+}
+
+
+// =============================================
+// VOICE LANGUAGE
+// =============================================
+
+function getVoiceLanguage() {
+    const selected =
+        $("sourceLanguage")?.value?.toLowerCase() || "auto";
+
+    const voiceLanguages = {
+        auto: "en-IN",
+        en: "en-IN",
+        hi: "hi-IN",
+        bn: "bn-IN",
+        ur: "ur-PK",
+        fr: "fr-FR",
+        de: "de-DE",
+        es: "es-ES",
+        ja: "ja-JP",
+        zh: "zh-CN",
+        "zh-cn": "zh-CN",
+        ar: "ar-SA",
+        ru: "ru-RU",
+        pt: "pt-PT",
+        it: "it-IT",
+        ne: "ne-NP",
+        pa: "pa-IN",
+        ta: "ta-IN",
+        te: "te-IN",
+        mr: "mr-IN",
+        gu: "gu-IN",
+        tr: "tr-TR",
+        nl: "nl-NL",
+        pl: "pl-PL",
+        uk: "uk-UA",
+        sv: "sv-SE",
+        da: "da-DK",
+        fi: "fi-FI",
+        el: "el-GR",
+        he: "he-IL",
+        th: "th-TH",
+        vi: "vi-VN",
+        id: "id-ID",
+        ms: "ms-MY"
+    };
+
+    return voiceLanguages[selected] || "en-IN";
+}
+
+
+// =============================================
+// VOICE BUTTON UI
+// =============================================
+
+function updateVoiceUI(listening) {
+    const voiceBtn = $("voiceBtn");
+    const voiceFab = $("voiceFab");
+    const voiceStatus = $("voiceStatus");
+
+    [voiceBtn, voiceFab].forEach(button => {
+        if (!button) return;
+
+        button.classList.toggle("listening", listening);
+
+        if (button.id === "voiceBtn") {
+            button.innerHTML = listening
+                ? '<i class="fa-solid fa-microphone"></i> Listening...'
+                : '<i class="fa-solid fa-microphone"></i> Voice';
+        }
+    });
+
+    if (voiceStatus) {
+        voiceStatus.textContent = listening
+            ? "Listening... Speak now."
+            : "";
+    }
+}
+
+function resetVoiceButton() {
+    updateVoiceUI(false);
+    recognition = null;
 }
 
 
@@ -646,15 +691,143 @@ if ($("captureBtn")) {
 // SMART VOICE INPUT
 // =============================================
 
-function getVoiceLanguage() {
+function startVoice() {
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
-    const selected =
-        $("sourceLanguage").value.toLowerCase();
+    if (!SpeechRecognition) {
+        showMessage(
+            "Voice input is not supported. Please use Chrome or Edge.",
+            "error"
+        );
+        return;
+    }
 
-    const voiceLanguages = {
+    const sourceText = $("sourceText");
 
-        auto: "en-IN",
-        en: "en-IN",
+    if (!sourceText) return;
+
+    if (recognition) {
+        recognition.stop();
+        return;
+    }
+
+    const currentRecognition = new SpeechRecognition();
+    recognition = currentRecognition;
+
+    currentRecognition.lang = getVoiceLanguage();
+    currentRecognition.continuous = false;
+    currentRecognition.interimResults = true;
+    currentRecognition.maxAlternatives = 1;
+
+    let finalTranscript = "";
+
+    updateVoiceUI(true);
+    showMessage("Listening... Speak now.");
+
+    currentRecognition.onresult = event => {
+        let interimTranscript = "";
+
+        for (
+            let i = event.resultIndex;
+            i < event.results.length;
+            i++
+        ) {
+            const transcript =
+                event.results[i][0].transcript;
+
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + " ";
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+
+        sourceText.value =
+            (finalTranscript + interimTranscript).trim();
+
+        updateCharacterCount();
+
+        sourceText.dispatchEvent(
+            new Event("input", { bubbles: true })
+        );
+    };
+
+    currentRecognition.onerror = event => {
+        const errors = {
+            "not-allowed":
+                "Microphone permission denied. Allow microphone access.",
+            "no-speech":
+                "No speech detected. Try again.",
+            "audio-capture":
+                "No microphone found.",
+            "network":
+                "Voice recognition network error.",
+            "service-not-allowed":
+                "Voice recognition service is blocked.",
+            "language-not-supported":
+                "Selected voice language is not supported."
+        };
+
+        showMessage(
+            errors[event.error] ||
+            `Voice error: ${event.error}`,
+            "error"
+        );
+    };
+
+    currentRecognition.onend = () => {
+        if (recognition === currentRecognition) {
+            resetVoiceButton();
+        }
+
+        if (sourceText.value.trim()) {
+            showMessage(
+                "Voice text added successfully.",
+                "success"
+            );
+        }
+    };
+
+    try {
+        currentRecognition.start();
+    } catch (error) {
+        console.error("Voice start error:", error);
+
+        resetVoiceButton();
+
+        showMessage(
+            "Unable to start microphone. Please try again.",
+            "error"
+        );
+    }
+}
+
+if ($("voiceBtn")) {
+    $("voiceBtn").addEventListener("click", startVoice);
+}
+
+// Floating microphone button - FIXED
+if ($("voiceFab")) {
+    $("voiceFab").addEventListener("click", startVoice);
+}
+
+if ($("multiVoice")) {
+    $("multiVoice").addEventListener("click", () => {
+        showPage("translator");
+        startVoice();
+    });
+}
+
+
+// =============================================
+// LISTEN TO TRANSLATED TEXT
+// =============================================
+
+function getSpeechLanguage(code) {
+    const speechCodes = {
+        en: "en-US",
         hi: "hi-IN",
         bn: "bn-IN",
         ur: "ur-PK",
@@ -673,274 +846,46 @@ function getVoiceLanguage() {
         te: "te-IN",
         mr: "mr-IN",
         gu: "gu-IN"
-
     };
 
-    return voiceLanguages[selected] ||
-        selected ||
-        "en-IN";
-
+    return speechCodes[code] || code || "en-US";
 }
-
-
-function resetVoiceButton() {
-
-    const voiceBtn = $("voiceBtn");
-
-    if (voiceBtn) {
-
-        voiceBtn.classList.remove("listening");
-
-        voiceBtn.innerHTML =
-            '<i class="fa-solid fa-microphone"></i> Voice';
-
-    }
-
-    recognition = null;
-
-}
-
-
-function startVoice() {
-
-    const SpeechRecognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-
-        showMessage(
-            "Voice input is not supported. Please use Chrome or Edge.",
-            "error"
-        );
-
-        return;
-    }
-
-    const voiceBtn = $("voiceBtn");
-
-    const sourceText = $("sourceText");
-
-    if (!voiceBtn || !sourceText) return;
-
-    if (recognition) {
-
-        recognition.stop();
-
-        return;
-    }
-
-    const currentRecognition =
-        new SpeechRecognition();
-
-    recognition = currentRecognition;
-
-    currentRecognition.lang =
-        getVoiceLanguage();
-
-    currentRecognition.continuous = false;
-
-    currentRecognition.interimResults = true;
-
-    currentRecognition.maxAlternatives = 1;
-
-    let finalTranscript = "";
-
-    voiceBtn.classList.add("listening");
-
-    voiceBtn.innerHTML =
-        '<i class="fa-solid fa-microphone"></i> Listening...';
-
-    showMessage("Listening... Speak now.");
-
-    currentRecognition.onresult = event => {
-
-        let interimTranscript = "";
-
-        for (
-            let i = event.resultIndex;
-            i < event.results.length;
-            i++
-        ) {
-
-            const transcript =
-                event.results[i][0].transcript;
-
-            if (event.results[i].isFinal) {
-
-                finalTranscript += transcript + " ";
-
-            } else {
-
-                interimTranscript += transcript;
-
-            }
-
-        }
-
-        sourceText.value =
-            (finalTranscript + interimTranscript).trim();
-
-        sourceText.dispatchEvent(
-            new Event("input", {
-                bubbles: true
-            })
-        );
-
-    };
-
-
-    currentRecognition.onerror = event => {
-
-        const errors = {
-
-            "not-allowed":
-                "Microphone permission denied. Allow microphone access.",
-
-            "no-speech":
-                "No speech detected. Try again.",
-
-            "audio-capture":
-                "No microphone found.",
-
-            "network":
-                "Voice recognition network error.",
-
-            "service-not-allowed":
-                "Voice recognition service is blocked.",
-
-            "language-not-supported":
-                "Selected voice language is not supported."
-
-        };
-
-        showMessage(
-            errors[event.error] ||
-            `Voice error: ${event.error}`,
-            "error"
-        );
-
-    };
-
-
-    currentRecognition.onend = () => {
-
-        if (recognition === currentRecognition) {
-            resetVoiceButton();
-        }
-
-        if (sourceText.value.trim()) {
-
-            showMessage(
-                "Voice text added successfully.",
-                "success"
-            );
-
-        }
-
-    };
-
-
-    try {
-
-        currentRecognition.start();
-
-    } catch (error) {
-
-        console.error(error);
-
-        resetVoiceButton();
-
-        showMessage(
-            "Unable to start microphone. Please try again.",
-            "error"
-        );
-
-    }
-
-}
-
-
-if ($("voiceBtn")) {
-
-    $("voiceBtn").addEventListener(
-        "click",
-        startVoice
-    );
-
-}
-
-
-if ($("multiVoice")) {
-
-    $("multiVoice").addEventListener(
-        "click",
-        () => {
-
-            showPage("translator");
-
-            startVoice();
-
-        }
-    );
-
-}
-
-
-// =============================================
-// LISTEN TO TRANSLATED TEXT
-// =============================================
 
 if ($("listenBtn")) {
-
-    $("listenBtn").addEventListener(
-        "click",
-        () => {
-
-            if (!lastTranslation) {
-
-                showMessage(
-                    "Nothing to listen to.",
-                    "error"
-                );
-
-                return;
-            }
-
-            if (!window.speechSynthesis) {
-
-                showMessage(
-                    "Speech playback is not supported.",
-                    "error"
-                );
-
-                return;
-            }
-
-            speechSynthesis.cancel();
-
-            const speech =
-                new SpeechSynthesisUtterance(
-                    lastTranslation
-                );
-
-            speech.lang =
-                $("targetLanguage").value || "en";
-
-            speech.rate = 0.95;
-
-            speech.pitch = 1;
-
-            speechSynthesis.speak(speech);
-
-            showMessage(
-                "Playing translated voice...",
-                "success"
-            );
-
+    $("listenBtn").addEventListener("click", () => {
+        if (!lastTranslation) {
+            showMessage("Nothing to listen to.", "error");
+            return;
         }
-    );
 
+        if (!window.speechSynthesis) {
+            showMessage(
+                "Speech playback is not supported.",
+                "error"
+            );
+            return;
+        }
+
+        speechSynthesis.cancel();
+
+        const speech = new SpeechSynthesisUtterance(
+            lastTranslation
+        );
+
+        speech.lang = getSpeechLanguage(
+            $("targetLanguage")?.value
+        );
+
+        speech.rate = 0.95;
+        speech.pitch = 1;
+
+        speechSynthesis.speak(speech);
+
+        showMessage(
+            "Playing translated voice...",
+            "success"
+        );
+    });
 }
 
 
@@ -949,51 +894,44 @@ if ($("listenBtn")) {
 // =============================================
 
 async function copyText(text) {
-
     try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(String(text));
+        } else {
+            const textarea = document.createElement("textarea");
+            textarea.value = String(text);
+            document.body.appendChild(textarea);
+            textarea.select();
 
-        await navigator.clipboard.writeText(
-            String(text)
-        );
+            const copied = document.execCommand("copy");
+            textarea.remove();
+
+            if (!copied) {
+                throw new Error("Copy failed");
+            }
+        }
+
+        showMessage("Copied successfully!", "success");
+
+    } catch (error) {
+        console.error("Copy error:", error);
 
         showMessage(
-            "Copied successfully!",
-            "success"
-        );
-
-    } catch {
-
-        showMessage(
-            "Clipboard permission unavailable.",
+            "Unable to copy text. Please copy manually.",
             "error"
         );
-
     }
-
 }
 
-
 if ($("copyBtn")) {
-
-    $("copyBtn").addEventListener(
-        "click",
-        () => {
-
-            if (!lastTranslation) {
-
-                showMessage(
-                    "Nothing to copy.",
-                    "error"
-                );
-
-                return;
-            }
-
-            copyText(lastTranslation);
-
+    $("copyBtn").addEventListener("click", () => {
+        if (!lastTranslation) {
+            showMessage("Nothing to copy.", "error");
+            return;
         }
-    );
 
+        copyText(lastTranslation);
+    });
 }
 
 
@@ -1002,65 +940,59 @@ if ($("copyBtn")) {
 // =============================================
 
 if ($("swapBtn")) {
+    $("swapBtn").addEventListener("click", () => {
+        const source = $("sourceLanguage");
+        const target = $("targetLanguage");
 
-    $("swapBtn").addEventListener(
-        "click",
-        () => {
+        if (!source || !target) return;
 
-            const source = $("sourceLanguage");
+        if (source.value === "auto") {
+            showMessage(
+                "Select a source language before swapping.",
+                "error"
+            );
+            return;
+        }
 
-            const target = $("targetLanguage");
+        if (!target.value) {
+            showMessage(
+                "Choose a target language first.",
+                "error"
+            );
+            return;
+        }
 
-            if (
-                source.value === "auto" ||
-                !target.value
-            ) {
+        if (source.value === target.value) {
+            showMessage(
+                "Source and target languages are already the same.",
+                "error"
+            );
+            return;
+        }
 
-                showMessage(
-                    "Choose source and target languages first.",
-                    "error"
-                );
+        const oldSource = source.value;
+        source.value = target.value;
+        target.value = oldSource;
 
-                return;
-            }
+        if (lastTranslation) {
+            $("sourceText").value = lastTranslation;
 
-            const oldSource = source.value;
-
-            source.value = target.value;
-
-            target.value = oldSource;
-
-            if (lastTranslation) {
-
-                $("sourceText").value =
-                    lastTranslation;
-
+            if ($("resultText")) {
                 $("resultText").textContent =
                     "Your translated text will appear here...";
-
-                lastTranslation = "";
-
-                if ($("resultMeta")) {
-                    $("resultMeta").textContent = "";
-                }
-
             }
 
-            if ($("charCount")) {
+            lastTranslation = "";
 
-                $("charCount").textContent =
-                    `${$("sourceText").value.length} / 5000`;
-
+            if ($("resultMeta")) {
+                $("resultMeta").textContent = "";
             }
-
-            showMessage(
-                "Languages swapped.",
-                "success"
-            );
-
         }
-    );
 
+        updateCharacterCount();
+
+        showMessage("Languages swapped.", "success");
+    });
 }
 
 
@@ -1069,21 +1001,17 @@ if ($("swapBtn")) {
 // =============================================
 
 function getHistory() {
-
     try {
-
-        return JSON.parse(
-            localStorage.getItem("translatorHistory") || "[]"
+        const history = JSON.parse(
+            storageGet("translatorHistory", "[]")
         );
 
+        return Array.isArray(history) ? history : [];
+
     } catch {
-
         return [];
-
     }
-
 }
-
 
 function saveHistory(
     source,
@@ -1091,55 +1019,65 @@ function saveHistory(
     sourceLang,
     targetLang
 ) {
-
-    let history = getHistory();
+    const history = getHistory();
 
     history.unshift({
-
         source: String(source),
-
         result: String(result),
-
         sourceLang: String(sourceLang),
-
         targetLang: String(targetLang),
-
         date: new Date().toLocaleString()
-
     });
 
-    history = history.slice(0, 50);
-
-    localStorage.setItem(
+    const saved = storageSet(
         "translatorHistory",
-        JSON.stringify(history)
+        JSON.stringify(history.slice(0, 50))
     );
 
+    if (!saved) {
+        console.warn("Translation history could not be saved.");
+    }
 }
 
 
+// =============================================
+// HTML SECURITY
+// =============================================
+
+function escapeHTML(value) {
+    return String(value).replace(
+        /[&<>"']/g,
+        char => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        })[char]
+    );
+}
+
+
+// =============================================
+// RENDER HISTORY
+// =============================================
+
 function renderHistory() {
-
     const history = getHistory();
-
     const list = $("historyList");
 
     if (!list) return;
 
     if (!history.length) {
-
         list.innerHTML = `
             <div class="empty-history">
                 No translations yet.
             </div>
         `;
-
         return;
     }
 
-    list.innerHTML = history.map(
-        (item, index) => `
-
+    list.innerHTML = history.map((item, index) => `
         <div class="history-item">
 
             <div>
@@ -1154,132 +1092,86 @@ function renderHistory() {
 
             <div>
                 <small>TRANSLATION</small>
-
                 <p>${escapeHTML(item.result)}</p>
             </div>
 
             <div class="history-actions">
-
-                <button data-copy="${index}">
-                    Copy
-                </button>
-
-                <button data-reuse="${index}">
-                    Reuse
-                </button>
-
+                <button data-copy="${index}">Copy</button>
+                <button data-reuse="${index}">Reuse</button>
             </div>
 
         </div>
-
     `).join("");
 
+    list.querySelectorAll("[data-copy]").forEach(button => {
+        button.addEventListener("click", () => {
+            const item =
+                history[Number(button.dataset.copy)];
 
-    list.querySelectorAll("[data-copy]").forEach(
-        button => {
+            if (item) copyText(item.result);
+        });
+    });
 
-            button.addEventListener(
-                "click",
-                () => {
+    list.querySelectorAll("[data-reuse]").forEach(button => {
+        button.addEventListener("click", () => {
+            const item =
+                history[Number(button.dataset.reuse)];
 
-                    const item =
-                        history[Number(button.dataset.copy)];
+            if (!item) return;
 
-                    copyText(item.result);
+            $("sourceText").value = item.source;
+            updateCharacterCount();
 
-                }
+            if ($("resultText")) {
+                $("resultText").textContent = item.result;
+            }
+
+            if ($("resultMeta")) {
+                $("resultMeta").textContent =
+                    `${item.result.length} characters`;
+            }
+
+            lastTranslation = item.result;
+
+            const source = languages.find(
+                lang => lang.name === item.sourceLang
             );
 
-        }
-    );
-
-
-    list.querySelectorAll("[data-reuse]").forEach(
-        button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    const item =
-                        history[Number(button.dataset.reuse)];
-
-                    $("sourceText").value =
-                        item.source;
-
-                    if ($("charCount")) {
-
-                        $("charCount").textContent =
-                            `${item.source.length} / 5000`;
-
-                    }
-
-                    $("resultText").textContent =
-                        item.result;
-
-                    if ($("resultMeta")) {
-
-                        $("resultMeta").textContent =
-                            `${item.result.length} characters`;
-
-                    }
-
-                    lastTranslation = item.result;
-
-                    const source = languages.find(
-                        lang => lang.name === item.sourceLang
-                    );
-
-                    const target = languages.find(
-                        lang => lang.name === item.targetLang
-                    );
-
-                    if (source) {
-                        $("sourceLanguage").value =
-                            source.code;
-                    }
-
-                    if (target) {
-                        $("targetLanguage").value =
-                            target.code;
-                    }
-
-                    showPage("translator");
-
-                    showMessage(
-                        "History translation restored.",
-                        "success"
-                    );
-
-                }
+            const target = languages.find(
+                lang => lang.name === item.targetLang
             );
 
-        }
-    );
+            if (source && $("sourceLanguage")) {
+                $("sourceLanguage").value = source.code;
+            }
 
+            if (target && $("targetLanguage")) {
+                $("targetLanguage").value = target.code;
+            }
+
+            showPage("translator");
+
+            showMessage(
+                "History translation restored.",
+                "success"
+            );
+        });
+    });
 }
 
 
+// =============================================
+// CLEAR HISTORY
+// =============================================
+
 if ($("clearHistory")) {
+    $("clearHistory").addEventListener("click", () => {
+        storageRemove("translatorHistory");
 
-    $("clearHistory").addEventListener(
-        "click",
-        () => {
+        renderHistory();
 
-            localStorage.removeItem(
-                "translatorHistory"
-            );
-
-            renderHistory();
-
-            showMessage(
-                "History cleared.",
-                "success"
-            );
-
-        }
-    );
-
+        showMessage("History cleared.", "success");
+    });
 }
 
 
@@ -1288,18 +1180,13 @@ if ($("clearHistory")) {
 // =============================================
 
 function showPage(pageName) {
+    document.querySelectorAll(".page").forEach(page => {
+        page.classList.remove("active");
+    });
 
-    document.querySelectorAll(".page").forEach(
-        page => {
-            page.classList.remove("active");
-        }
-    );
-
-    document.querySelectorAll(".nav-btn").forEach(
-        button => {
-            button.classList.remove("active");
-        }
-    );
+    document.querySelectorAll(".nav-btn").forEach(button => {
+        button.classList.remove("active");
+    });
 
     const page = $(pageName);
 
@@ -1315,9 +1202,7 @@ function showPage(pageName) {
         navButton.classList.add("active");
     }
 
-    if ($("navLinks")) {
-        $("navLinks").classList.remove("show");
-    }
+    $("navLinks")?.classList.remove("show");
 
     if (pageName === "history") {
         renderHistory();
@@ -1327,26 +1212,15 @@ function showPage(pageName) {
         top: 0,
         behavior: "smooth"
     });
-
 }
 
+document.querySelectorAll("[data-page]").forEach(button => {
+    button.addEventListener("click", event => {
+        event.preventDefault();
 
-document.querySelectorAll("[data-page]").forEach(
-    button => {
-
-        button.addEventListener(
-            "click",
-            event => {
-
-                event.preventDefault();
-
-                showPage(button.dataset.page);
-
-            }
-        );
-
-    }
-);
+        showPage(button.dataset.page);
+    });
+});
 
 
 // =============================================
@@ -1354,27 +1228,24 @@ document.querySelectorAll("[data-page]").forEach(
 // =============================================
 
 function updateThemeIcon() {
-
     const dark =
         document.body.classList.contains("dark");
 
-    if (!$("themeToggle")) return;
+    const themeToggle = $("themeToggle");
 
-    $("themeToggle").innerHTML = dark
+    if (!themeToggle) return;
+
+    themeToggle.innerHTML = dark
         ? '<i class="fa-solid fa-sun"></i>'
         : '<i class="fa-solid fa-moon"></i>';
 
-    $("themeToggle").title = dark
+    themeToggle.title = dark
         ? "Switch to Light Mode"
         : "Switch to Dark Mode";
-
 }
 
-
 function loadTheme() {
-
-    const theme =
-        localStorage.getItem("translatorTheme");
+    const theme = storageGet("translatorTheme", "light");
 
     document.body.classList.toggle(
         "dark",
@@ -1382,31 +1253,22 @@ function loadTheme() {
     );
 
     updateThemeIcon();
-
 }
 
-
 if ($("themeToggle")) {
+    $("themeToggle").addEventListener("click", () => {
+        document.body.classList.toggle("dark");
 
-    $("themeToggle").addEventListener(
-        "click",
-        () => {
+        const dark =
+            document.body.classList.contains("dark");
 
-            document.body.classList.toggle("dark");
+        storageSet(
+            "translatorTheme",
+            dark ? "dark" : "light"
+        );
 
-            const dark =
-                document.body.classList.contains("dark");
-
-            localStorage.setItem(
-                "translatorTheme",
-                dark ? "dark" : "light"
-            );
-
-            updateThemeIcon();
-
-        }
-    );
-
+        updateThemeIcon();
+    });
 }
 
 
@@ -1415,69 +1277,31 @@ if ($("themeToggle")) {
 // =============================================
 
 if ($("menuToggle")) {
-
-    $("menuToggle").addEventListener(
-        "click",
-        () => {
-
-            if ($("navLinks")) {
-                $("navLinks").classList.toggle("show");
-            }
-
-        }
-    );
-
+    $("menuToggle").addEventListener("click", () => {
+        $("navLinks")?.classList.toggle("show");
+    });
 }
 
 
 // =============================================
-// HTML SECURITY
+// CLEANUP
 // =============================================
 
-function escapeHTML(value) {
-
-    return String(value).replace(
-        /[&<>"']/g,
-        char => ({
-
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-
-        })[char]
-    );
-
-}
-
-
-// =============================================
-// CLEANUP CAMERA AND VOICE
-// =============================================
-
-window.addEventListener(
-    "beforeunload",
-    () => {
-
-        if (cameraStream) {
-
-            cameraStream.getTracks().forEach(
-                track => track.stop()
-            );
-
-        }
-
-        if (recognition) {
-            recognition.stop();
-        }
-
-        if (window.speechSynthesis) {
-            speechSynthesis.cancel();
-        }
-
+window.addEventListener("beforeunload", () => {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => {
+            track.stop();
+        });
     }
-);
+
+    if (recognition) {
+        recognition.stop();
+    }
+
+    if (window.speechSynthesis) {
+        speechSynthesis.cancel();
+    }
+});
 
 
 // =============================================
@@ -1485,10 +1309,9 @@ window.addEventListener(
 // =============================================
 
 loadTheme();
-
 loadLanguages();
-
 renderHistory();
+updateCharacterCount();
 
 console.log(
     "TransAI AI Translator initialized successfully."

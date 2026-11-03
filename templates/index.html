@@ -5,22 +5,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <meta name="theme-color" content="#101827">
+    <meta name="description" content="TransAI - Translate text, images and voice across multiple languages.">
+
     <title>TransAI | AI Language Translator</title>
 
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 
+    <!-- Icons -->
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
+    <!-- CSS -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
 
-<!-- NAVBAR -->
+<!-- =====================================
+     NAVBAR
+===================================== -->
 
 <header class="navbar">
 
@@ -38,31 +46,30 @@
 
     </a>
 
-
     <nav class="nav-links" id="navLinks">
 
-        <button class="nav-btn active" data-page="translator">
+        <button type="button" class="nav-btn active" data-page="translator">
             Translator
         </button>
 
-        <button class="nav-btn" data-page="multimodal">
+        <button type="button" class="nav-btn" data-page="multimodal">
             Multimodal
         </button>
 
-        <button class="nav-btn" data-page="history">
+        <button type="button" class="nav-btn" data-page="history">
             History
         </button>
 
-        <button class="nav-btn" data-page="docs">
+        <button type="button" class="nav-btn" data-page="docs">
             API Docs
         </button>
 
     </nav>
 
-
     <div class="nav-actions">
 
-        <button id="themeToggle"
+        <button type="button"
+        id="themeToggle"
         class="theme-toggle"
         title="Change theme"
         aria-label="Toggle theme">
@@ -72,8 +79,11 @@
 
         </button>
 
-        <button id="menuToggle" class="menu-toggle">
+        <button type="button" id="menuToggle" class="menu-toggle"
+        aria-label="Open menu">
+
             <i class="fa-solid fa-bars"></i>
+
         </button>
 
     </div>
@@ -83,13 +93,11 @@
 
 <main class="container">
 
-
-<!-- ================================= -->
-<!-- TRANSLATOR PAGE -->
-<!-- ================================= -->
+<!-- =====================================
+     TRANSLATOR PAGE
+===================================== -->
 
 <section id="translator" class="page active">
-
 
     <div class="heading">
 
@@ -109,7 +117,6 @@
 
         </div>
 
-
         <div class="status">
             <span></span>
             Translation engine ready
@@ -118,18 +125,15 @@
     </div>
 
 
-    <!-- LANGUAGE GLOBE DECORATION -->
+    <!-- LANGUAGE GLOBE -->
 
     <div class="language-globe">
 
         <div class="globe-circle"></div>
 
         <div class="language-bubble bubble-one">अ</div>
-
         <div class="language-bubble bubble-two">Hello</div>
-
         <div class="language-bubble bubble-three">Bonjour</div>
-
         <div class="language-bubble bubble-four">你好</div>
 
     </div>
@@ -138,7 +142,6 @@
     <!-- TRANSLATOR GRID -->
 
     <div class="translator-grid">
-
 
         <!-- SOURCE CARD -->
 
@@ -151,62 +154,52 @@
                     Source Language
                 </h3>
 
-                <select id="sourceLanguage">
+                <select id="sourceLanguage" aria-label="Source language">
 
-                    <option value="auto">
-                        Auto-detect
-                    </option>
+                    <option value="auto">Auto-detect</option>
 
                 </select>
 
             </div>
 
-
             <textarea
                 id="sourceText"
                 placeholder="Type your text here..."
                 maxlength="4500"
-                spellcheck="true"></textarea>
-
+                spellcheck="true"
+                aria-label="Enter text to translate"></textarea>
 
             <div class="card-bottom">
 
-                <span id="charCount">
-                    0 / 4500
-                </span>
-
+                <span id="charCount">0 / 4500</span>
 
                 <div class="tools">
 
-                    <button id="cameraBtn" title="Camera">
+                    <button type="button" id="cameraBtn" title="Camera">
 
                         <i class="fa-solid fa-camera"></i>
                         Camera
 
                     </button>
 
-                    
                     <button type="button" id="voiceBtn" title="Voice Input">
-                          <i class="fa-solid fa-microphone"></i>
-                          Voice
+
+                        <i class="fa-solid fa-microphone"></i>
+                        Voice
+
                     </button>
 
-
-
-                   
-
-                    <button id="uploadBtn" title="Upload Image">
+                    <button type="button" id="uploadBtn" title="Upload Image">
 
                         <i class="fa-solid fa-cloud-arrow-up"></i>
                         Upload
 
                     </button>
 
-
                     <input
                         type="file"
                         id="imageInput"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp,image/bmp"
                         hidden>
 
                 </div>
@@ -219,9 +212,11 @@
         <!-- SWAP BUTTON -->
 
         <button
+            type="button"
             id="swapBtn"
             class="swap-btn"
-            title="Swap languages">
+            title="Swap languages"
+            aria-label="Swap languages">
 
             <i class="fa-solid fa-arrow-right-arrow-left"></i>
 
@@ -239,17 +234,13 @@
                     Translation Result
                 </h3>
 
+                <select id="targetLanguage" aria-label="Target language">
 
-                <select id="targetLanguage">
-
-                    <option value="">
-                        Choose Language
-                    </option>
+                    <option value="">Choose Language</option>
 
                 </select>
 
             </div>
-
 
             <div id="resultText" class="result-box">
 
@@ -259,31 +250,26 @@
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
 
-                    <p>
-                        Your translated text will appear here...
-                    </p>
+                    <p>Your translated text will appear here...</p>
 
                 </div>
 
             </div>
 
-
             <div class="card-bottom">
 
                 <span id="resultMeta"></span>
 
-
                 <div class="tools">
 
-                    <button id="copyBtn" title="Copy Translation">
+                    <button type="button" id="copyBtn" title="Copy Translation">
 
                         <i class="fa-regular fa-copy"></i>
                         Copy
 
                     </button>
 
-
-                    <button id="listenBtn" title="Listen to Translation">
+                    <button type="button" id="listenBtn" title="Listen to Translation">
 
                         <i class="fa-solid fa-volume-high"></i>
                         Listen
@@ -301,7 +287,7 @@
 
     <!-- TRANSLATE BUTTON -->
 
-    <button id="translateBtn" class="translate-main">
+    <button type="button" id="translateBtn" class="translate-main">
 
         <i class="fa-solid fa-wand-magic-sparkles"></i>
 
@@ -311,8 +297,7 @@
 
     </button>
 
-
-    <p id="message"></p>
+    <p id="message" role="status" aria-live="polite"></p>
 
 
     <!-- FLOATING VOICE BUTTON -->
@@ -330,17 +315,18 @@
 
         </div>
 
-
         <button
+            type="button"
             id="voiceFab"
             class="voice-fab"
-            title="Start Voice Recognition">
+            title="Start Voice Recognition"
+            aria-label="Start voice recognition">
 
             <i class="fa-solid fa-microphone"></i>
 
         </button>
 
-        <p id="voiceStatus">
+        <p id="voiceStatus" aria-live="polite">
             Voice assistant
         </p>
 
@@ -350,7 +336,6 @@
     <!-- FEATURES -->
 
     <div class="feature-grid">
-
 
         <div class="feature-card">
 
@@ -365,7 +350,6 @@
 
         </div>
 
-
         <div class="feature-card">
 
             <div class="feature-icon">
@@ -378,7 +362,6 @@
             </div>
 
         </div>
-
 
         <div class="feature-card">
 
@@ -398,10 +381,9 @@
 </section>
 
 
-
-<!-- ================================= -->
-<!-- MULTIMODAL PAGE -->
-<!-- ================================= -->
+<!-- =====================================
+     MULTIMODAL PAGE
+===================================== -->
 
 <section id="multimodal" class="page">
 
@@ -428,6 +410,7 @@
 
     <div class="module-grid">
 
+        <!-- IMAGE -->
 
         <div class="module-card">
 
@@ -441,13 +424,17 @@
                 Extract text from images and translate it.
             </p>
 
-            <button id="multiUpload">
+            <button type="button" id="multiUpload">
+
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 Choose Image →
+
             </button>
 
         </div>
 
+
+        <!-- CAMERA -->
 
         <div class="module-card">
 
@@ -461,13 +448,17 @@
                 Capture signs, menus and documents.
             </p>
 
-            <button id="multiCamera">
+            <button type="button" id="multiCamera">
+
                 <i class="fa-solid fa-camera"></i>
                 Open Camera →
+
             </button>
 
         </div>
 
+
+        <!-- VOICE -->
 
         <div class="module-card">
 
@@ -481,26 +472,23 @@
                 Speak and convert your voice into text.
             </p>
 
-            <button id="multiVoice">
+            <button type="button" id="multiVoice">
+
                 <i class="fa-solid fa-microphone"></i>
                 Start Speaking →
+
             </button>
 
         </div>
 
-
     </div>
-
-
-    
 
 </section>
 
 
-
-<!-- ================================= -->
-<!-- HISTORY PAGE -->
-<!-- ================================= -->
+<!-- =====================================
+     HISTORY PAGE
+===================================== -->
 
 <section id="history" class="page">
 
@@ -522,8 +510,7 @@
 
         </div>
 
-
-        <button id="clearHistory" class="secondary-btn">
+        <button type="button" id="clearHistory" class="secondary-btn">
 
             <i class="fa-solid fa-trash-can"></i>
             Clear History
@@ -531,7 +518,6 @@
         </button>
 
     </div>
-
 
     <div id="historyList" class="history-list">
 
@@ -544,10 +530,9 @@
 </section>
 
 
-
-<!-- ================================= -->
-<!-- API DOCS PAGE -->
-<!-- ================================= -->
+<!-- =====================================
+     API DOCUMENTATION PAGE
+===================================== -->
 
 <section id="docs" class="page">
 
@@ -576,7 +561,7 @@
 
         <h3>Base URL</h3>
 
-        <pre>http://127.0.0.1:8000</pre>
+        <pre>/</pre>
 
 
         <h3>Get Languages</h3>
@@ -606,7 +591,8 @@
         <pre>/translate-image
 
 Form Data:
-image
+file
+source_language
 target_language</pre>
 
 
@@ -620,7 +606,7 @@ target_language</pre>
         <p>
             Interactive documentation:
 
-            <a href="/docs" target="_blank">
+            <a href="/docs" target="_blank" rel="noopener noreferrer">
                 Open FastAPI Docs →
             </a>
         </p>
@@ -632,16 +618,15 @@ target_language</pre>
 </main>
 
 
-
-<!-- FOOTER -->
+<!-- =====================================
+     FOOTER
+===================================== -->
 
 <footer>
 
     <div class="footer-brand">
 
-        <span class="footer-logo">
-            A文
-        </span>
+        <span class="footer-logo">A文</span>
 
         <strong>TransAI</strong>
 
@@ -654,15 +639,14 @@ target_language</pre>
 </footer>
 
 
+<!-- =====================================
+     CAMERA MODAL
+===================================== -->
 
-<!-- ================================= -->
-<!-- CAMERA MODAL -->
-<!-- ================================= -->
-
-<div id="cameraModal" class="modal">
+<div id="cameraModal" class="modal" role="dialog" aria-modal="true"
+aria-label="Camera capture">
 
     <div class="modal-content">
-
 
         <div class="modal-header">
 
@@ -671,7 +655,7 @@ target_language</pre>
                 Capture Image
             </h2>
 
-            <button id="closeCamera">
+            <button type="button" id="closeCamera" aria-label="Close camera">
 
                 <i class="fa-solid fa-xmark"></i>
 
@@ -679,17 +663,14 @@ target_language</pre>
 
         </div>
 
-
         <video
             id="cameraVideo"
             autoplay
             playsinline></video>
 
-
         <canvas id="cameraCanvas" hidden></canvas>
 
-
-        <button id="captureBtn" class="translate-main">
+        <button type="button" id="captureBtn" class="translate-main">
 
             <i class="fa-solid fa-camera"></i>
 
@@ -702,10 +683,11 @@ target_language</pre>
 </div>
 
 
+<!-- =====================================
+     JAVASCRIPT
+===================================== -->
 
-<!-- JAVASCRIPT -->
-
-<script src="/static/app.js"></script>
+<script src="/static/app.js" defer></script>
 
 </body>
 </html>
