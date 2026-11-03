@@ -1,0 +1,711 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>TransAI | AI Language Translator</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+
+<header class="navbar">
+
+    <a href="#" class="brand" data-page="translator">
+
+        <div class="brand-logo">
+            <span>A</span>
+            <span class="logo-symbol">文</span>
+        </div>
+
+        <div class="brand-text">
+            <strong>Trans<span>AI</span></strong>
+            <small>AI Translator</small>
+        </div>
+
+    </a>
+
+
+    <nav class="nav-links" id="navLinks">
+
+        <button class="nav-btn active" data-page="translator">
+            Translator
+        </button>
+
+        <button class="nav-btn" data-page="multimodal">
+            Multimodal
+        </button>
+
+        <button class="nav-btn" data-page="history">
+            History
+        </button>
+
+        <button class="nav-btn" data-page="docs">
+            API Docs
+        </button>
+
+    </nav>
+
+
+    <div class="nav-actions">
+
+        <button id="themeToggle"
+        class="theme-toggle"
+        title="Change theme"
+        aria-label="Toggle theme">
+
+            <i class="fa-solid fa-sun"></i>
+            <i class="fa-solid fa-moon"></i>
+
+        </button>
+
+        <button id="menuToggle" class="menu-toggle">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+    </div>
+
+</header>
+
+
+<main class="container">
+
+
+<!-- ================================= -->
+<!-- TRANSLATOR PAGE -->
+<!-- ================================= -->
+
+<section id="translator" class="page active">
+
+
+    <div class="heading">
+
+        <div>
+
+            <p class="eyebrow">
+                YOUR WORLD, WITHOUT LANGUAGE LIMITS
+            </p>
+
+            <h1>
+                Say it in <span>any language.</span>
+            </h1>
+
+            <p class="subtitle">
+                Fast, clear and effortless translation powered by AI.
+            </p>
+
+        </div>
+
+
+        <div class="status">
+            <span></span>
+            Translation engine ready
+        </div>
+
+    </div>
+
+
+    <!-- LANGUAGE GLOBE DECORATION -->
+
+    <div class="language-globe">
+
+        <div class="globe-circle"></div>
+
+        <div class="language-bubble bubble-one">अ</div>
+
+        <div class="language-bubble bubble-two">Hello</div>
+
+        <div class="language-bubble bubble-three">Bonjour</div>
+
+        <div class="language-bubble bubble-four">你好</div>
+
+    </div>
+
+
+    <!-- TRANSLATOR GRID -->
+
+    <div class="translator-grid">
+
+
+        <!-- SOURCE CARD -->
+
+        <div class="translate-card source-card">
+
+            <div class="card-header">
+
+                <h3>
+                    <i class="fa-solid fa-globe"></i>
+                    Source Language
+                </h3>
+
+                <select id="sourceLanguage">
+
+                    <option value="auto">
+                        Auto-detect
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <textarea
+                id="sourceText"
+                placeholder="Type your text here..."
+                maxlength="4500"
+                spellcheck="true"></textarea>
+
+
+            <div class="card-bottom">
+
+                <span id="charCount">
+                    0 / 4500
+                </span>
+
+
+                <div class="tools">
+
+                    <button id="cameraBtn" title="Camera">
+
+                        <i class="fa-solid fa-camera"></i>
+                        Camera
+
+                    </button>
+
+                    
+                    <button type="button" id="voiceBtn" title="Voice Input">
+                          <i class="fa-solid fa-microphone"></i>
+                          Voice
+                    </button>
+
+
+
+                   
+
+                    <button id="uploadBtn" title="Upload Image">
+
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        Upload
+
+                    </button>
+
+
+                    <input
+                        type="file"
+                        id="imageInput"
+                        accept="image/*"
+                        hidden>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- SWAP BUTTON -->
+
+        <button
+            id="swapBtn"
+            class="swap-btn"
+            title="Swap languages">
+
+            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+
+        </button>
+
+
+        <!-- RESULT CARD -->
+
+        <div class="translate-card result-card">
+
+            <div class="card-header">
+
+                <h3>
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    Translation Result
+                </h3>
+
+
+                <select id="targetLanguage">
+
+                    <option value="">
+                        Choose Language
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div id="resultText" class="result-box">
+
+                <div class="empty-state">
+
+                    <div>
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+
+                    <p>
+                        Your translated text will appear here...
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="card-bottom">
+
+                <span id="resultMeta"></span>
+
+
+                <div class="tools">
+
+                    <button id="copyBtn" title="Copy Translation">
+
+                        <i class="fa-regular fa-copy"></i>
+                        Copy
+
+                    </button>
+
+
+                    <button id="listenBtn" title="Listen to Translation">
+
+                        <i class="fa-solid fa-volume-high"></i>
+                        Listen
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- TRANSLATE BUTTON -->
+
+    <button id="translateBtn" class="translate-main">
+
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+
+        Translate
+
+        <i class="fa-solid fa-arrow-right"></i>
+
+    </button>
+
+
+    <p id="message"></p>
+
+
+    <!-- FLOATING VOICE BUTTON -->
+
+    <div class="voice-float-container">
+
+        <div class="voice-tooltip">
+
+            <i class="fa-solid fa-wave-square"></i>
+
+            <div>
+                <strong>Click to Speak</strong>
+                <small>Speak & translate</small>
+            </div>
+
+        </div>
+
+
+        <button
+            id="voiceFab"
+            class="voice-fab"
+            title="Start Voice Recognition">
+
+            <i class="fa-solid fa-microphone"></i>
+
+        </button>
+
+        <p id="voiceStatus">
+            Voice assistant
+        </p>
+
+    </div>
+
+
+    <!-- FEATURES -->
+
+    <div class="feature-grid">
+
+
+        <div class="feature-card">
+
+            <div class="feature-icon">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+
+            <div>
+                <h4>Fast Translation</h4>
+                <p>Get results in seconds.</p>
+            </div>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <div class="feature-icon">
+                <i class="fa-solid fa-globe"></i>
+            </div>
+
+            <div>
+                <h4>Multiple Languages</h4>
+                <p>Translate across languages.</p>
+            </div>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <div class="feature-icon">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+
+            <div>
+                <h4>Easy to Use</h4>
+                <p>Simple and intuitive experience.</p>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================================= -->
+<!-- MULTIMODAL PAGE -->
+<!-- ================================= -->
+
+<section id="multimodal" class="page">
+
+    <div class="heading">
+
+        <div>
+
+            <p class="eyebrow">
+                ONE WORKSPACE, MANY INPUTS
+            </p>
+
+            <h1>
+                Translate beyond <span>text.</span>
+            </h1>
+
+            <p class="subtitle">
+                Translate using images, camera and voice.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div class="module-grid">
+
+
+        <div class="module-card">
+
+            <div class="module-icon">
+                <i class="fa-solid fa-image"></i>
+            </div>
+
+            <h2>Image Translation</h2>
+
+            <p>
+                Extract text from images and translate it.
+            </p>
+
+            <button id="multiUpload">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                Choose Image →
+            </button>
+
+        </div>
+
+
+        <div class="module-card">
+
+            <div class="module-icon">
+                <i class="fa-solid fa-camera"></i>
+            </div>
+
+            <h2>Camera Translation</h2>
+
+            <p>
+                Capture signs, menus and documents.
+            </p>
+
+            <button id="multiCamera">
+                <i class="fa-solid fa-camera"></i>
+                Open Camera →
+            </button>
+
+        </div>
+
+
+        <div class="module-card">
+
+            <div class="module-icon">
+                <i class="fa-solid fa-microphone"></i>
+            </div>
+
+            <h2>Voice Translation</h2>
+
+            <p>
+                Speak and convert your voice into text.
+            </p>
+
+            <button id="multiVoice">
+                <i class="fa-solid fa-microphone"></i>
+                Start Speaking →
+            </button>
+
+        </div>
+
+
+    </div>
+
+
+    
+
+</section>
+
+
+
+<!-- ================================= -->
+<!-- HISTORY PAGE -->
+<!-- ================================= -->
+
+<section id="history" class="page">
+
+    <div class="heading">
+
+        <div>
+
+            <p class="eyebrow">
+                YOUR RECENT ACTIVITY
+            </p>
+
+            <h1>
+                Translation <span>History.</span>
+            </h1>
+
+            <p class="subtitle">
+                Access your recent translations.
+            </p>
+
+        </div>
+
+
+        <button id="clearHistory" class="secondary-btn">
+
+            <i class="fa-solid fa-trash-can"></i>
+            Clear History
+
+        </button>
+
+    </div>
+
+
+    <div id="historyList" class="history-list">
+
+        <div class="empty-state">
+            No translations yet.
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================================= -->
+<!-- API DOCS PAGE -->
+<!-- ================================= -->
+
+<section id="docs" class="page">
+
+    <div class="heading">
+
+        <div>
+
+            <p class="eyebrow">
+                FOR DEVELOPERS
+            </p>
+
+            <h1>
+                API <span>Documentation.</span>
+            </h1>
+
+            <p class="subtitle">
+                Integrate TransAI into your applications.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div class="docs-card">
+
+        <h3>Base URL</h3>
+
+        <pre>http://127.0.0.1:8000</pre>
+
+
+        <h3>Get Languages</h3>
+
+        <span class="method get">GET</span>
+
+        <pre>/languages</pre>
+
+
+        <h3>Text Translation</h3>
+
+        <span class="method post">POST</span>
+
+        <pre>/translate
+
+{
+  "text": "Hello",
+  "source_language": "auto",
+  "target_language": "hi"
+}</pre>
+
+
+        <h3>Image Translation</h3>
+
+        <span class="method post">POST</span>
+
+        <pre>/translate-image
+
+Form Data:
+image
+target_language</pre>
+
+
+        <h3>Health Check</h3>
+
+        <span class="method get">GET</span>
+
+        <pre>/health</pre>
+
+
+        <p>
+            Interactive documentation:
+
+            <a href="/docs" target="_blank">
+                Open FastAPI Docs →
+            </a>
+        </p>
+
+    </div>
+
+</section>
+
+</main>
+
+
+
+<!-- FOOTER -->
+
+<footer>
+
+    <div class="footer-brand">
+
+        <span class="footer-logo">
+            A文
+        </span>
+
+        <strong>TransAI</strong>
+
+    </div>
+
+    <small>
+        • Breaking Language Barriers
+    </small>
+
+</footer>
+
+
+
+<!-- ================================= -->
+<!-- CAMERA MODAL -->
+<!-- ================================= -->
+
+<div id="cameraModal" class="modal">
+
+    <div class="modal-content">
+
+
+        <div class="modal-header">
+
+            <h2>
+                <i class="fa-solid fa-camera"></i>
+                Capture Image
+            </h2>
+
+            <button id="closeCamera">
+
+                <i class="fa-solid fa-xmark"></i>
+
+            </button>
+
+        </div>
+
+
+        <video
+            id="cameraVideo"
+            autoplay
+            playsinline></video>
+
+
+        <canvas id="cameraCanvas" hidden></canvas>
+
+
+        <button id="captureBtn" class="translate-main">
+
+            <i class="fa-solid fa-camera"></i>
+
+            Capture & Translate
+
+        </button>
+
+    </div>
+
+</div>
+
+
+
+<!-- JAVASCRIPT -->
+
+<script src="/static/app.js"></script>
+
+</body>
+</html>
