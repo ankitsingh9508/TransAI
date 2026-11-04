@@ -1,4 +1,3 @@
-
 // =============================================
 // TRANSAI - PREMIUM AI TRANSLATOR
 // COMPLETE JAVASCRIPT - VERSION 4.1
@@ -10,6 +9,8 @@ let languages = [];
 let lastTranslation = "";
 let cameraStream = null;
 let recognition = null;
+let pendingImageFile = null;
+let imagePreviewURL = null;
 
 const MAX_CHARACTERS = 4500;
 
@@ -358,6 +359,123 @@ if ($("sourceText")) {
 
 
 // =============================================
+// IMAGE PREVIEW
+// =============================================
+
+function showImagePreview(file) {
+    if (!file) return;
+
+    // Always show the preview on the translator page, including
+    // when the image was selected from the Multimodal page.
+    showPage("translator");
+
+    pendingImageFile = file;
+
+    if (imagePreviewURL) {
+        URL.revokeObjectURL(imagePreviewURL);
+    }
+
+    imagePreviewURL = URL.createObjectURL(file);
+
+    let panel = $("imagePreviewPanel");
+
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "imagePreviewPanel";
+        panel.style.cssText = [
+            "display:none",
+            "margin-top:16px",
+            "padding:14px",
+            "border:1px solid var(--border-color, #dbe2ea)",
+            "border-radius:14px",
+            "background:var(--card-bg, #fff)",
+            "width:100%",
+            "box-sizing:border-box"
+        ].join(";");
+
+        const sourceCard = document.querySelector(".source-card");
+        if (sourceCard) {
+            sourceCard.appendChild(panel);
+        }
+    }
+
+    panel.innerHTML = "";
+
+    const heading = document.createElement("div");
+    heading.textContent = "Image Preview";
+    heading.style.cssText = "font-weight:700;margin-bottom:10px;";
+
+    const image = document.createElement("img");
+    image.id = "imagePreview";
+    image.src = imagePreviewURL;
+    image.alt = "Selected image preview";
+    image.style.cssText = [
+        "display:block",
+        "width:100%",
+        "max-height:300px",
+        "object-fit:contain",
+        "border-radius:10px",
+        "background:#f1f5f9",
+        "margin-bottom:10px"
+    ].join(";");
+
+    const filename = document.createElement("p");
+    filename.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+    filename.style.cssText = "font-size:13px;opacity:.75;overflow-wrap:anywhere;margin:8px 0 12px;";
+
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;";
+
+    const translateButton = document.createElement("button");
+    translateButton.type = "button";
+    translateButton.textContent = "Translate Image";
+    translateButton.className = "translate-main";
+    translateButton.style.cssText = "flex:1;min-width:150px;";
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.className = "secondary-btn";
+
+    translateButton.addEventListener("click", async () => {
+        if (!pendingImageFile) return;
+        translateButton.disabled = true;
+        translateButton.textContent = "Processing image...";
+        try {
+            await translateImage(pendingImageFile);
+        } finally {
+            translateButton.disabled = false;
+            translateButton.textContent = "Translate Image";
+        }
+    });
+
+    removeButton.addEventListener("click", clearImagePreview);
+
+    actions.append(translateButton, removeButton);
+    panel.append(heading, image, filename, actions);
+    panel.style.display = "block";
+
+    showMessage("Image ready. Check the preview, then click Translate Image.", "success");
+}
+
+function clearImagePreview() {
+    pendingImageFile = null;
+
+    if (imagePreviewURL) {
+        URL.revokeObjectURL(imagePreviewURL);
+        imagePreviewURL = null;
+    }
+
+    const panel = $("imagePreviewPanel");
+    if (panel) {
+        panel.style.display = "none";
+        panel.innerHTML = "";
+    }
+
+    if ($("imageInput")) {
+        $("imageInput").value = "";
+    }
+}// =============================================
 // IMAGE TRANSLATION
 // =============================================
 
@@ -467,9 +585,10 @@ if ($("imageInput")) {
         const file = event.target.files[0];
 
         if (file) {
-            translateImage(file);
+            showImagePreview(file);
         }
 
+        // Reset input so the same image can be selected again.
         event.target.value = "";
     });
 }
@@ -599,7 +718,7 @@ if ($("captureBtn")) {
             { type: "image/jpeg" }
         );
 
-        translateImage(file);
+        showImagePreview(file);
     });
 }
 
@@ -845,13 +964,34 @@ function getSpeechLanguage(code) {
         ta: "ta-IN",
         te: "te-IN",
         mr: "mr-IN",
+        gu: "gu-IN",
+        tr: "tr-TR",
+        nl: "nl-NL",
+        pl: "pl-PL",
+        uk: "uk-UA",
+        sv: "sv-SE",
+        da: "da-DK",
+        fi: "fi-FI",
+        el: "el-GR",
+        he: "he-IL",
+        th: "th-TH",
+        vi: "vi-VN",
+        id: "id-ID",
+        ms: "ms-MY",
+        ar: "ar-SA",
+        ru: "ru-RU",
+        pt: "pt-PT",
+        it: "it-IT",
+        ne: "ne-NP",
+        pa: "pa-IN",
+        ta: "ta-IN",
+        te: "te-IN",
+        mr: "mr-IN",
         gu: "gu-IN"
     };
 
     return speechCodes[code] || code || "en-US";
-}
-
-if ($("listenBtn")) {
+}if ($("listenBtn")) {
     $("listenBtn").addEventListener("click", () => {
         if (!lastTranslation) {
             showMessage("Nothing to listen to.", "error");
